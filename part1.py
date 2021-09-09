@@ -1,3 +1,10 @@
+#part 1
+import pandas
+import argparse
+import cv2
+import webcolors
+from skimage import exposure
+
 try:
     import os
     import json
@@ -16,41 +23,39 @@ except ImportError:
     print("Need to fix the installation")
     raise
 
+kernel = np.array([[-1, -1, -1],
+                   [-1, 9, -1],
+                   [-1, -1, -1]])
 
-kernel = np.array([[-1,-1,-1],
-                   [-1,9,-1],
-                   [-1,-1,-1]])
-
-kernel2 = np.array([[ -1, -1, -1, -1, -1],
-                    [  3,  2,  2, -1, -1],
-                    [  3,  2, -1, -1, -1],
-                    [  3,  2,  2, -1, -1],
-                    [ -1, -1, -1, -1, -1]])
+kernel2 = np.array([[-1, -1, -1, -1, -1],
+                    [3, 2, 2, -1, -1],
+                    [3, 2, -1, -1, -1],
+                    [3, 2, 2, -1, -1],
+                    [-1, -1, -1, -1, -1]])
 
 kernel3 = np.array([[-1, -1, -1, -1, -1, -1, -1],
-                   [ -1,  1,  1, -1, -1, -1, -1],
-                   [  4,  3,  1,  1, -1, -1, -1],
-                   [  4,  2,  1, -1, -1, -1, -1],
-                   [  4,  2,  1, -1, -1, -1, -1],
-                   [  4,  2,  1, -1, -1, -1, -1],
-                   [  4,  3,  1,  1, -1, -1, -1],
-                   [ -1,  1,  1, -1, -1, -1, -1],
-                   [ -1, -1, -1, -1, -1, -1, -1]])
+                    [-1, 1, 1, -1, -1, -1, -1],
+                    [4, 3, 1, 1, -1, -1, -1],
+                    [4, 2, 1, -1, -1, -1, -1],
+                    [4, 2, 1, -1, -1, -1, -1],
+                    [4, 2, 1, -1, -1, -1, -1],
+                    [4, 3, 1, 1, -1, -1, -1],
+                    [-1, 1, 1, -1, -1, -1, -1],
+                    [-1, -1, -1, -1, -1, -1, -1]])
 
-kernel4 = np.array([[ -1, -1, -1, -1, -1],
-                    [ -1,  2,  2,  2, -1],
-                    [ -2,  2,  3,  2, -2],
-                    [ -1,  2,  2,  2, -1],
-                    [ -1, -1, -1, -1, -1]])
-
+kernel4 = np.array([[-1, -1, -1, -1, -1],
+                    [-1, 2, 2, 2, -1],
+                    [-2, 2, 3, 2, -2],
+                    [-1, 2, 2, 2, -1],
+                    [-1, -1, -1, -1, -1]])
 
 kernel1 = np.array([
-         [-1 / 256,  -4 / 256,  -6 / 256,  -4 / 256, -1 / 256],
-         [-4 / 256, 6 / 256, 6 / 256, 6 / 256, -4 / 256],
-         [-6 / 256, 6 / 256, 12 / 256, 6 / 256, -6 / 256],
-         [-4 / 256, 6 / 256, 6 / 256, 6 / 256, -4 / 256],
-         [-1 / 256,  -4 / 256,  -6 / 256,  -4 / 256, -1 / 256]
-     ])
+    [-1 / 256, -4 / 256, -6 / 256, -4 / 256, -1 / 256],
+    [-4 / 256, 6 / 256, 6 / 256, 6 / 256, -4 / 256],
+    [-6 / 256, 6 / 256, 12 / 256, 6 / 256, -6 / 256],
+    [-4 / 256, 6 / 256, 6 / 256, 6 / 256, -4 / 256],
+    [-1 / 256, -4 / 256, -6 / 256, -4 / 256, -1 / 256]
+])
 
 
 def find_tfl_lights(c_image: np.ndarray, **kwargs):
@@ -60,10 +65,10 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs):
     :param kwargs: Whatever config you want to pass in here
     :return: 4-tuple of x_red, y_red, x_green, y_green
     """
-    #0 blue, 1 green, 2 red
+    # 0 blue, 1 green, 2 red
     img_gray = rgb2gray(c_image)
 
-    yellow_blue = c_image[:,:,2]
+    yellow_blue = c_image[:, :, 2]
     green_image = c_image.copy()  # Make a copy
     green_image[:, :, 0] = 0
     green_image[:, :, 2] = 0
@@ -80,7 +85,7 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs):
     plt.subplot(122, sharex=h1, sharey=h1)
     plt.imshow(conv_im1)
 
-    #res = scipy.ndimage.maximum_filter(conv_im1, 155)
+    # res = scipy.ndimage.maximum_filter(conv_im1, 155)
     xList = []
     yList = []
 
@@ -88,14 +93,13 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs):
     threshold = 1500
     data_max = scipy.ndimage.maximum_filter(conv_im1, neighborhood_size)
     maxima = (conv_im1 == data_max)
-    #data_min =  scipy.ndimage.minimum_filter(conv_im1, neighborhood_size)
-    #diff = ((data_max - data_min) > threshold)
+    # data_min =  scipy.ndimage.minimum_filter(conv_im1, neighborhood_size)
+    # diff = ((data_max - data_min) > threshold)
     diff = (data_max > threshold)
     maxima[diff == 0] = 0
 
     labeled, num_objects = ndimage.label(maxima)
     slices = ndimage.find_objects(labeled)
-
 
     for dy, dx in slices:
         x_center = (dx.start + dx.stop - 1) / 2
@@ -107,12 +111,12 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs):
     print(xList)
     print(yList)
 
-    indexes_line =[]
+    indexes_line = []
 
     for i in range(len(xList)):
         flag = True
-        for j in range(1,28):
-            if (int(yList[i])-j)<1032 and conv_im1[int(yList[i])-j][int(xList[i])] < 2000:
+        for j in range(1, 28):
+            if (int(yList[i]) - j) < 1032 and conv_im1[int(yList[i]) - j][int(xList[i])] < 2000:
                 flag = False
         if flag == True:
             indexes_line.append(i)
@@ -125,7 +129,6 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs):
             yList_good.append(yList[i])
     print(xList_good, yList_good)
 
-
     xList_red = []
     yList_red = []
     xList_green = []
@@ -133,26 +136,25 @@ def find_tfl_lights(c_image: np.ndarray, **kwargs):
 
     for i in range(len(xList_good)):
         print(c_image[int(yList_good[i])][int(xList_good[i])])
-        if np.argmax(c_image[int(yList_good[i])][int(xList_good[i])])==1:
+        if np.argmax(c_image[int(yList_good[i])][int(xList_good[i])]) == 1:
             xList_green.append(xList_good[i])
             yList_green.append(yList_good[i])
             print(c_image[int(yList_good[i])][int(xList_good[i])])
             print("green")
-        if np.argmax(c_image[int(yList_good[i])][int(xList_good[i])])==2:
+        if np.argmax(c_image[int(yList_good[i])][int(xList_good[i])]) == 2:
             xList_red.append(xList_good[i])
             yList_red.append(yList_good[i])
             print(c_image[int(yList_good[i])][int(xList_good[i])])
             print("red")
 
-    #print( xList_red, yList_red, xList_green, yList_green)
+    # print( xList_red, yList_red, xList_green, yList_green)
 
-
-    #return xList_red, yList_red, xList_green, yList_green
+    # return xList_red, yList_red, xList_green, yList_green
     return xList_good, yList_good
 
     ### WRITE YOUR CODE HERE ###
     ### USE HELPER FUNCTIONS ###
-    #return [500, 510, 520], [500, 500, 500], [700, 710], [500, 500]
+    # return [500, 510, 520], [500, 500, 500], [700, 710], [500, 500]
 
 
 ### GIVEN CODE TO TEST YOUR IMPLENTATION AND PLOT THE PICTURES
@@ -180,15 +182,14 @@ def test_find_tfl_lights(image_path, json_path=None, fig_num=None):
         gt_data = json.load(open(json_path))
         what = ['traffic light']
         objects = [o for o in gt_data['objects'] if o['label'] in what]
-
+        return objects
     show_image_and_gt(image, objects, fig_num)
 
-    #red_x, red_y, green_x, green_y= find_tfl_lights(image)
-    #plt.plot(red_x, red_y, 'ro', color='r', markersize=4)
-    #plt.plot(green_x, green_y, 'ro', color='g', markersize=4)
+    # red_x, red_y, green_x, green_y= find_tfl_lights(image)
+    # plt.plot(red_x, red_y, 'ro', color='r', markersize=4)
+    # plt.plot(green_x, green_y, 'ro', color='g', markersize=4)
     red_x, red_y = find_tfl_lights(image)
     plt.plot(red_x, red_y, 'ro', color='r', markersize=4)
-
 
 
 def main(argv=None):
@@ -202,7 +203,7 @@ def main(argv=None):
     parser.add_argument("-j", "--json", type=str, help="Path to json GT for comparison")
     parser.add_argument('-d', '--dir', type=str, help='Directory to scan images in')
     args = parser.parse_args(argv)
-    default_base = r"C:\Users\hadas\Documents\image"
+    default_base = r"C:\Users\aannr\Downloads\leftImg8bit_trainvaltest\leftImg8bit\train\aachen"
 
     if args.dir is None:
         args.dir = default_base
@@ -220,6 +221,74 @@ def main(argv=None):
     else:
         print("Bad configuration?? Didn't find any picture to show")
     plt.show(block=True)
+
+
+index = ["color", "color_name", "hex", "R", "G", "B"]
+csv = pandas.read_csv(r'C:\Users\aannr\Downloads\python-project-color-detection\colors.csv', names=index, header=None)
+
+
+def check_color(points, img_path):
+    cnames = []
+    # index = ["color", "color_name", "hex", "R", "G", "B"]
+    # csv = pandas.read_csv(r'C:\Users\aannr\Downloads\python-project-color-detection\colors.csv', names=index, header=None)
+    img = cv2.imread(img_path)
+    # for point in points:
+    #     x, y = point
+    #
+    #     b, g, r = img[int(y), int(x)]
+    #     b = int(b)
+    #     g = int(g)
+    #     r = int(r)
+    #     minimum = 100000000
+    #     for i in range(len(csv)):
+    #         d = abs(r - int(csv.loc[i, "R"])) + abs(g - int(csv.loc[i, "G"])) + abs(b - int(csv.loc[i, "B"]))
+    #         if (d <= minimum):
+    #             minimum = d
+    #             cname= csv.loc[i, "color_name"]
+    #     cnames.append(cname)
+    # return cnames
+    colors = []
+    for point in points:
+        y = int(point[1])
+        x = int(point[0])
+        for y_top in range(y, y + 20):
+            for x_right in range(x, x + 20):
+                b, g, r = img[x_right, y_top]
+                cnames.append(my_color(r, g, b))
+        for y_top in range(y - 20, y):
+            for x_right in range(x - 20, x):
+                b, g, r = img[x_right, y_top]
+                cnames.append(my_color(r, g, b))
+        for y_top in range(y, y + 20):
+            for x_right in range(x - 20, x):
+                b, g, r = img[x_right, y_top]
+                cnames.append(my_color(r, g, b))
+        for y_top in range(y - 20, y):
+            for x_right in range(x, x + 20):
+                b, g, r = img[x_right, y_top]
+                cnames.append(my_color(r, g, b))
+        if cnames.count('g') > cnames.count('r'):
+            colors.append('g')
+        elif cnames.count('g') < cnames.count('r'):
+            colors.append('r')
+
+
+def my_color(r, g, b):
+    cname = webcolors.rgb_to_name((r,g,b))
+    return cname
+    b = int(b)
+    g = int(g)
+    r = int(r)
+    minimum = 10000
+    for i in range(len(csv)):
+        d = abs(r - int(csv.loc[i, "R"])) + abs(g - int(csv.loc[i, "G"])) + abs(b - int(csv.loc[i, "B"]))
+        if (d <= minimum):
+            minimum = d
+            cname = csv.loc[i, "color_name"]
+    if cname.find('Green') != -1:
+        return 'g'
+    elif cname.find('Red') != -1:
+        return 'r'
 
 
 if __name__ == '__main__':
